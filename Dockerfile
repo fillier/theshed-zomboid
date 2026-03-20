@@ -1,6 +1,8 @@
-FROM cm2network/steamcmd:root
+FROM ubuntu:22.04
 
-# PZ dedicated server requires 32-bit libraries and curl/jq for mod management
+ENV DEBIAN_FRONTEND=noninteractive
+
+# PZ server requires 32-bit libs; curl/jq for mod management; tini for signal handling
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -9,23 +11,31 @@ RUN dpkg --add-architecture i386 && \
         curl \
         jq \
         ca-certificates \
+        wget \
         tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy management scripts
+# Install SteamCMD from Valve's CDN into a fixed location
+RUN mkdir -p /opt/steamcmd && \
+    wget -qO- https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | \
+    tar -xzf - -C /opt/steamcmd
+
+ENV STEAMCMDDIR=/opt/steamcmd
+
+# Pre-create volume mount points with correct ownership (running as root)
+RUN mkdir -p /server /data
+
 COPY scripts/ /app/scripts/
 RUN chmod +x /app/scripts/*.sh
 
-# /server = PZ dedicated server installation (large, ~3GB)
+# /server = PZ dedicated server installation (~3GB)
 # /data   = PZ configdir: saves, server config, logs
 VOLUME ["/server", "/data"]
 
 WORKDIR /server
 
-# Primary game port (UDP), secondary game port (UDP = primary+1), RCON (TCP)
 EXPOSE 16261/udp
 EXPOSE 16262/udp
 EXPOSE 27015/tcp
 
-# tini as init to handle signals and zombie processes properly
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/scripts/entrypoint.sh"]
