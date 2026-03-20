@@ -1,0 +1,6 @@
+# Don't commit secrets or local overrides
+.env
+
+# Docker data directories if someone binds locally
+server/
+data/
