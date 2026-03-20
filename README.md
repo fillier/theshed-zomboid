@@ -133,9 +133,11 @@ UPDATE_MODS=false
 
 ## Steam Credentials
 
-Anonymous SteamCMD login works for the dedicated server and most workshop mods. If you hit `No subscription` errors for specific mods, provide a Steam account that owns PZ:
+**Steam credentials are required.** App `380870` (PZ Dedicated Server) cannot be downloaded via SteamCMD with anonymous login — this is a Steam limitation, not a bug. Any free Steam account works; you do not need to own Project Zomboid.
 
 ```env
 STEAM_USERNAME=your_steam_username
 STEAM_PASSWORD=your_steam_password
 ```
+
+Set these in your `.env` before the first `docker compose up`.

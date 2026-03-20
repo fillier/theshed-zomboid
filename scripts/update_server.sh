@@ -12,6 +12,17 @@ STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 
 log() { echo "[update_server] $*"; }
 
+# App 380870 (PZ Dedicated Server) is a free Steam tool but cannot be downloaded
+# via anonymous SteamCMD — an authenticated account is required (any free account works).
+if [ -z "${STEAM_USERNAME}" ]; then
+    echo ""
+    echo "ERROR: STEAM_USERNAME and STEAM_PASSWORD must be set in your .env file."
+    echo "  The PZ dedicated server (App 380870) cannot be downloaded anonymously via SteamCMD."
+    echo "  Any free Steam account works — you do not need to own Project Zomboid."
+    echo ""
+    exit 1
+fi
+
 SCRIPT_FILE=$(mktemp /tmp/steamcmd_XXXXXX.txt)
 trap 'rm -f "${SCRIPT_FILE}"' EXIT
 
@@ -20,13 +31,8 @@ trap 'rm -f "${SCRIPT_FILE}"' EXIT
     echo "@NoPromptForPassword 1"
     echo "force_install_dir /server"
 
-    if [ -n "${STEAM_USERNAME}" ]; then
-        log "Logging into Steam as ${STEAM_USERNAME}"
-        echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
-    else
-        log "Using anonymous Steam login"
-        echo "login anonymous"
-    fi
+    log "Logging into Steam as ${STEAM_USERNAME}"
+    echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
 
     if [ -n "${BETA_BRANCH}" ]; then
         log "Targeting beta branch: ${BETA_BRANCH}"
