@@ -7,7 +7,7 @@
 set -euo pipefail
 
 PZ_GAME_ID=108600
-STEAMCMD=/home/steam/steamcmd/steamcmd.sh
+STEAMCMD="${STEAMCMDDIR:-/home/steam/steamcmd}/steamcmd.sh"
 WORKSHOP_CONTENT="/server/steamapps/workshop/content/${PZ_GAME_ID}"
 
 STEAM_COLLECTION_ID="${STEAM_COLLECTION_ID:-}"
@@ -63,32 +63,37 @@ if [ ${#ALL_WORKSHOP_IDS[@]} -eq 0 ]; then
 fi
 
 # ── Step 3: Download workshop items via SteamCMD ──────────────────────────────
-if [ -n "${STEAM_USERNAME}" ]; then
-    LOGIN_ARGS=("+login" "${STEAM_USERNAME}" "${STEAM_PASSWORD}")
-else
-    LOGIN_ARGS=("+login" "anonymous")
-fi
+# Use +runscript so commands survive steamcmd's self-update restart
+MOD_SCRIPT_FILE=$(mktemp /tmp/steamcmd_mods_XXXXXX.txt)
+trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
 
-# Build SteamCMD args with all workshop downloads
-# force_install_dir must come before login
-STEAMCMD_ARGS=(
-    "+force_install_dir" "/server"
-    "${LOGIN_ARGS[@]}"
-)
+{
+    echo "@ShutdownOnFailedCommand 1"
+    echo "@NoPromptForPassword 1"
+    echo "force_install_dir /server"
 
-for WID in "${ALL_WORKSHOP_IDS[@]}"; do
-    ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
-    if [ -d "$ITEM_PATH" ] && [ "${UPDATE_MODS}" != "true" ]; then
-        log "Skipping already-downloaded mod ${WID} (UPDATE_MODS=false)"
+    if [ -n "${STEAM_USERNAME}" ]; then
+        echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
     else
-        STEAMCMD_ARGS+=("+workshop_download_item" "${PZ_GAME_ID}" "${WID}")
+        echo "login anonymous"
     fi
-done
 
-STEAMCMD_ARGS+=("+quit")
+    DOWNLOAD_COUNT=0
+    for WID in "${ALL_WORKSHOP_IDS[@]}"; do
+        ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
+        if [ -d "$ITEM_PATH" ] && [ "${UPDATE_MODS}" != "true" ]; then
+            log "Skipping already-downloaded mod ${WID} (UPDATE_MODS=false)"
+        else
+            echo "workshop_download_item ${PZ_GAME_ID} ${WID}"
+            DOWNLOAD_COUNT=$(( DOWNLOAD_COUNT + 1 ))
+        fi
+    done
 
-log "Downloading ${#ALL_WORKSHOP_IDS[@]} workshop item(s) via SteamCMD..."
-"${STEAMCMD}" "${STEAMCMD_ARGS[@]}" || {
+    echo "quit"
+} > "${MOD_SCRIPT_FILE}"
+
+log "Downloading workshop item(s) via SteamCMD..."
+"${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" || {
     EXIT=$?
     [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT" >&2; exit $EXIT; }
 }
