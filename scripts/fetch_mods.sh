@@ -70,9 +70,10 @@ else
 fi
 
 # Build SteamCMD args with all workshop downloads
+# force_install_dir must come before login
 STEAMCMD_ARGS=(
-    "${LOGIN_ARGS[@]}"
     "+force_install_dir" "/server"
+    "${LOGIN_ARGS[@]}"
 )
 
 for WID in "${ALL_WORKSHOP_IDS[@]}"; do

@@ -29,8 +29,8 @@ UPDATE_ARGS+=("validate")
 
 log "Running SteamCMD..."
 "${STEAMCMD}" \
-    "${LOGIN_ARGS[@]}" \
     +force_install_dir /server \
+    "${LOGIN_ARGS[@]}" \
     "${UPDATE_ARGS[@]}" \
     +quit
 
