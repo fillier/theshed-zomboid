@@ -25,10 +25,19 @@ if [ "$(id -u)" = "0" ]; then
                 --shell /bin/bash pzuser
     fi
 
-    # Ensure the bind-mount root dirs are owned by the target user so SteamCMD
-    # and the server can write freely. Only the top-level dirs are touched here;
-    # SteamCMD creates its own subdirectories as the correct user.
-    chown "${PUID}:${PGID}" /server /data
+    # If the server was previously run as root (or a different UID), the steamapps
+    # subtree will be owned by that old user. SteamCMD running as the new UID
+    # can't write into it, so workshop mods end up in the wrong place.
+    # Detect this and do a one-time recursive chown to fix ownership.
+    for DIR in /server /data; do
+        EXISTING_OWNER=$(stat -c '%u' "${DIR}" 2>/dev/null || echo "")
+        if [ -n "$EXISTING_OWNER" ] && [ "$EXISTING_OWNER" != "${PUID}" ]; then
+            log "Fixing ownership of ${DIR} (uid was ${EXISTING_OWNER}, changing to ${PUID} — may take a moment)..."
+            chown -R "${PUID}:${PGID}" "${DIR}"
+        else
+            chown "${PUID}:${PGID}" "${DIR}"
+        fi
+    done
 
     log "Dropping to uid=${PUID} gid=${PGID}"
     exec gosu "${PUID}:${PGID}" "$0" "$@"
@@ -67,7 +76,8 @@ if [ -n "${STEAM_COLLECTION_ID}" ] || [ -n "${EXTRA_WORKSHOP_IDS}" ]; then
     MOD_RESULTS=$(/app/scripts/fetch_mods.sh)
     MODS_LIST=$(echo "$MOD_RESULTS" | grep '^MODS=' | cut -d= -f2- || true)
     WORKSHOP_LIST=$(echo "$MOD_RESULTS" | grep '^WORKSHOP=' | cut -d= -f2- || true)
-    log "Mods resolved: $(echo "$MODS_LIST" | tr ';' '\n' | wc -l | tr -d ' ') mod(s)"
+    log "Mod IDs  : ${MODS_LIST:-<none>}"
+    log "Workshop : ${WORKSHOP_LIST:-<none>}"
 else
     log "No Steam collection or extra workshop IDs configured — skipping mod fetch"
     MODS_LIST="${PZ_INI_Mods:-}"
