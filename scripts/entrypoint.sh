@@ -54,6 +54,7 @@ UPDATE_MODS="${UPDATE_MODS:-true}"
 BETA_BRANCH="${BETA_BRANCH:-}"
 STEAM_COLLECTION_ID="${STEAM_COLLECTION_ID:-}"
 EXTRA_WORKSHOP_IDS="${EXTRA_WORKSHOP_IDS:-}"
+MEMORY="${MEMORY:-8192m}"
 
 PZ_BIN="/server/start-server.sh"
 CONFIG_DIR="/data"
@@ -78,6 +79,19 @@ if [ ! -f "$PZ_BIN" ] || [ "${UPDATE_ON_START}" = "true" ]; then
     /app/scripts/update_server.sh
 else
     log "Skipping server update (UPDATE_ON_START=false and server already installed)"
+fi
+
+# ── Step 1b: Configure JVM Memory ─────────────────────────────────────────────
+# PZ reads heap settings from ProjectZomboid64.json. Patch it after every
+# install/update so the MEMORY env var is always applied.
+PZ_JSON="/server/ProjectZomboid64.json"
+if [ -f "${PZ_JSON}" ]; then
+    jq --arg xmx "-Xmx${MEMORY}" --arg xms "-Xms${MEMORY}" \
+        '.vmArgs |= map(if startswith("-Xmx") then $xmx elif startswith("-Xms") then $xms else . end)' \
+        "${PZ_JSON}" > "${PZ_JSON}.tmp" && mv "${PZ_JSON}.tmp" "${PZ_JSON}"
+    log "JVM memory: ${MEMORY} (Xms + Xmx)"
+else
+    log "WARNING: ${PZ_JSON} not found — memory setting skipped"
 fi
 
 # ── Step 2: Fetch and Download Mods ───────────────────────────────────────────
