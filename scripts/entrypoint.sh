@@ -64,6 +64,7 @@ SERVER_CONFIG_DIR="${CONFIG_DIR}/Server"
 # Symlink it to CONFIG_DIR so all data lands on the mounted /data volume and
 # persists across container restarts.
 PZ_ZOMBOID_DIR="/home/pzuser/Zomboid"
+mkdir -p "$(dirname "${PZ_ZOMBOID_DIR}")"
 if [ -d "${PZ_ZOMBOID_DIR}" ] && [ ! -L "${PZ_ZOMBOID_DIR}" ]; then
     log "Migrating ${PZ_ZOMBOID_DIR} → ${CONFIG_DIR} (one-time)..."
     cp -rp "${PZ_ZOMBOID_DIR}/." "${CONFIG_DIR}/" 2>/dev/null || true
