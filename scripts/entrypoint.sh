@@ -59,6 +59,18 @@ PZ_BIN="/server/start-server.sh"
 CONFIG_DIR="/data"
 SERVER_CONFIG_DIR="${CONFIG_DIR}/Server"
 
+# ── Link ~/Zomboid to the data volume ──────────────────────────────────────────
+# PZ writes saves, logs, and player data to ~/Zomboid regardless of -configdir.
+# Symlink it to CONFIG_DIR so all data lands on the mounted /data volume and
+# persists across container restarts.
+PZ_ZOMBOID_DIR="/home/pzuser/Zomboid"
+if [ -d "${PZ_ZOMBOID_DIR}" ] && [ ! -L "${PZ_ZOMBOID_DIR}" ]; then
+    log "Migrating ${PZ_ZOMBOID_DIR} → ${CONFIG_DIR} (one-time)..."
+    cp -rp "${PZ_ZOMBOID_DIR}/." "${CONFIG_DIR}/" 2>/dev/null || true
+    rm -rf "${PZ_ZOMBOID_DIR}"
+fi
+ln -sf "${CONFIG_DIR}" "${PZ_ZOMBOID_DIR}"
+
 # ── Step 1: Install / Update Server ───────────────────────────────────────────
 if [ ! -f "$PZ_BIN" ] || [ "${UPDATE_ON_START}" = "true" ]; then
     log "Installing / updating Project Zomboid dedicated server..."
