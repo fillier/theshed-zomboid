@@ -132,9 +132,11 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
         if [ -n "$MOD_ID" ]; then
             log "  Workshop ${WID} → mod ID: ${MOD_ID}"
             MODS_OUT=$(append_unique "$MODS_OUT" "$MOD_ID")
+            log "  DEBUG: MODS_OUT is now '${MODS_OUT}'"
             FOUND_ANY=true
         fi
     done < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)
+    log "  DEBUG: after inner loop MODS_OUT='${MODS_OUT}'"
 
     if [ "$FOUND_ANY" = false ]; then
         log "WARNING: No mod.info found in workshop item ${WID}"
@@ -143,5 +145,6 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
 done
 
 # ── Step 5: Output results ────────────────────────────────────────────────────
+log "DEBUG: final MODS_OUT='${MODS_OUT}' WORKSHOP_OUT='${WORKSHOP_OUT}'"
 echo "MODS=${MODS_OUT}"
 echo "WORKSHOP=${WORKSHOP_OUT}"
