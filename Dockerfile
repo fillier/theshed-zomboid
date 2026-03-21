@@ -15,14 +15,16 @@ RUN dpkg --add-architecture i386 && \
         tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Install SteamCMD from Valve's CDN into a fixed location
+# Install SteamCMD and pre-initialise it (triggers self-update at build time,
+# not at runtime — avoids any self-update restart issues during the app install)
 RUN mkdir -p /opt/steamcmd && \
     wget -qO- https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | \
-    tar -xzf - -C /opt/steamcmd
+    tar -xzf - -C /opt/steamcmd && \
+    /opt/steamcmd/steamcmd.sh +quit || true
 
 ENV STEAMCMDDIR=/opt/steamcmd
 
-# Pre-create volume mount points with correct ownership (running as root)
+# Pre-create volume mount points owned by root
 RUN mkdir -p /server /data
 
 COPY scripts/ /app/scripts/

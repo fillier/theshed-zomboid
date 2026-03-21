@@ -1,38 +1,36 @@
 #!/bin/bash
 # update_server.sh — Install or update the PZ dedicated server via SteamCMD
-#
-# Uses +runscript so commands survive steamcmd's self-update restart.
 set -euo pipefail
 
 PZ_APP_ID=380870
-STEAMCMD="${STEAMCMDDIR:-/home/steam/steamcmd}/steamcmd.sh"
+STEAMCMD="${STEAMCMDDIR:-/opt/steamcmd}/steamcmd.sh"
 BETA_BRANCH="${BETA_BRANCH:-}"
 STEAM_USERNAME="${STEAM_USERNAME:-}"
 STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 
 log() { echo "[update_server] $*"; }
 
-# App 380870 (PZ Dedicated Server) is a free Steam tool but cannot be downloaded
-# via anonymous SteamCMD — an authenticated account is required (any free account works).
-if [ -z "${STEAM_USERNAME}" ]; then
-    echo ""
-    echo "ERROR: STEAM_USERNAME and STEAM_PASSWORD must be set in your .env file."
-    echo "  The PZ dedicated server (App 380870) cannot be downloaded anonymously via SteamCMD."
-    echo "  Any free Steam account works — you do not need to own Project Zomboid."
-    echo ""
-    exit 1
-fi
+# Ensure the install dir exists and is writable before SteamCMD touches it
+mkdir -p /server
+chmod 755 /server
+
+log "Install dir: $(ls -ld /server)"
+log "Running as: $(id)"
+log "SteamCMD: ${STEAMCMD}"
 
 SCRIPT_FILE=$(mktemp /tmp/steamcmd_XXXXXX.txt)
 trap 'rm -f "${SCRIPT_FILE}"' EXIT
 
 {
-    echo "@ShutdownOnFailedCommand 1"
-    echo "@NoPromptForPassword 1"
     echo "force_install_dir /server"
 
-    log "Logging into Steam as ${STEAM_USERNAME}"
-    echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
+    if [ -n "${STEAM_USERNAME}" ]; then
+        log "Logging into Steam as ${STEAM_USERNAME}"
+        echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
+    else
+        log "Using anonymous Steam login"
+        echo "login anonymous"
+    fi
 
     if [ -n "${BETA_BRANCH}" ]; then
         log "Targeting beta branch: ${BETA_BRANCH}"
@@ -43,6 +41,9 @@ trap 'rm -f "${SCRIPT_FILE}"' EXIT
 
     echo "quit"
 } > "${SCRIPT_FILE}"
+
+log "SteamCMD script:"
+cat "${SCRIPT_FILE}" >&2
 
 log "Running SteamCMD..."
 "${STEAMCMD}" +runscript "${SCRIPT_FILE}" || {
