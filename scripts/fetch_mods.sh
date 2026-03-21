@@ -112,17 +112,19 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
 
     WORKSHOP_ARRAY+=("$WID")
 
-    # Search recursively for mod.info files — a single workshop item can contain
-    # multiple mods, each in its own subdirectory with its own mod.info
+    # PZ mods can have mod.info at the workshop root OR inside mods/<Name>/mod.info
+    # Prefer the mods/ subdirectory layout (new style); fall back to root mod.info.
+    # Only search 3 levels deep to avoid picking up unrelated nested files.
     FOUND_ANY=false
     while IFS= read -r -d '' MODINFO_FILE; do
-        MOD_ID=$(grep -m1 '^id=' "$MODINFO_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n')
+        # || true prevents set -e from exiting when grep finds no 'id=' line
+        MOD_ID=$(grep -m1 '^id=' "$MODINFO_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n') || true
         if [ -n "$MOD_ID" ]; then
             log "  Workshop ${WID} → mod ID: ${MOD_ID}"
             MODS_ARRAY+=("$MOD_ID")
             FOUND_ANY=true
         fi
-    done < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)
+    done < <(find "$ITEM_PATH" -maxdepth 3 -name "mod.info" -print0 2>/dev/null)
 
     if [ "$FOUND_ANY" = false ]; then
         log "WARNING: No mod.info found in workshop item ${WID}"
