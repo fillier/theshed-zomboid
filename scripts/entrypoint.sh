@@ -2,7 +2,39 @@
 # entrypoint.sh — Project Zomboid dedicated server startup orchestration
 set -euo pipefail
 
-# ── Defaults ──────────────────────────────────────────────────────────────────
+log() { echo "[entrypoint] $*"; }
+
+# ── Privilege setup ────────────────────────────────────────────────────────────
+# Runs once as root to create the target user/group and fix volume ownership,
+# then re-execs this script as that user. All subsequent steps run unprivileged.
+if [ "$(id -u)" = "0" ]; then
+    PUID="${PUID:-1000}"
+    PGID="${PGID:-1000}"
+
+    log "Setting up user uid=${PUID} gid=${PGID}..."
+
+    # Create group with the requested GID if it doesn't already exist
+    if ! getent group "${PGID}" >/dev/null 2>&1; then
+        groupadd --gid "${PGID}" pzgroup
+    fi
+
+    # Create user with the requested UID if it doesn't already exist
+    if ! getent passwd "${PUID}" >/dev/null 2>&1; then
+        useradd --uid "${PUID}" --gid "${PGID}" \
+                --home-dir /home/pzuser --create-home \
+                --shell /bin/bash pzuser
+    fi
+
+    # Ensure the bind-mount root dirs are owned by the target user so SteamCMD
+    # and the server can write freely. Only the top-level dirs are touched here;
+    # SteamCMD creates its own subdirectories as the correct user.
+    chown "${PUID}:${PGID}" /server /data
+
+    log "Dropping to uid=${PUID} gid=${PGID}"
+    exec gosu "${PUID}:${PGID}" "$0" "$@"
+fi
+
+# ── Defaults ───────────────────────────────────────────────────────────────────
 SERVER_NAME="${SERVER_NAME:-zomboid}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-changeme}"
 SERVER_PORT="${SERVER_PORT:-16261}"
@@ -18,8 +50,6 @@ PZ_BIN="/server/start-server.sh"
 CONFIG_DIR="/data"
 SERVER_CONFIG_DIR="${CONFIG_DIR}/Server"
 
-log() { echo "[entrypoint] $*"; }
-
 # ── Step 1: Install / Update Server ───────────────────────────────────────────
 if [ ! -f "$PZ_BIN" ] || [ "${UPDATE_ON_START}" = "true" ]; then
     log "Installing / updating Project Zomboid dedicated server..."
@@ -34,19 +64,16 @@ WORKSHOP_LIST=""
 
 if [ -n "${STEAM_COLLECTION_ID}" ] || [ -n "${EXTRA_WORKSHOP_IDS}" ]; then
     log "Resolving mods..."
-    # fetch_mods.sh writes two temp files and prints the paths
     MOD_RESULTS=$(/app/scripts/fetch_mods.sh)
-    MODS_LIST=$(echo "$MOD_RESULTS" | grep '^MODS=' | cut -d= -f2-)
-    WORKSHOP_LIST=$(echo "$MOD_RESULTS" | grep '^WORKSHOP=' | cut -d= -f2-)
+    MODS_LIST=$(echo "$MOD_RESULTS" | grep '^MODS=' | cut -d= -f2- || true)
+    WORKSHOP_LIST=$(echo "$MOD_RESULTS" | grep '^WORKSHOP=' | cut -d= -f2- || true)
     log "Mods resolved: $(echo "$MODS_LIST" | tr ';' '\n' | wc -l | tr -d ' ') mod(s)"
 else
     log "No Steam collection or extra workshop IDs configured — skipping mod fetch"
-    # Fall through to any manually set PZ_INI_Mods / PZ_INI_WorkshopItems values
     MODS_LIST="${PZ_INI_Mods:-}"
     WORKSHOP_LIST="${PZ_INI_WorkshopItems:-}"
 fi
 
-# Export resolved lists so the config scripts can pick them up
 export RESOLVED_MODS="$MODS_LIST"
 export RESOLVED_WORKSHOP="$WORKSHOP_LIST"
 
@@ -59,6 +86,7 @@ mkdir -p "${SERVER_CONFIG_DIR}"
 
 # ── Step 4: Start Server ───────────────────────────────────────────────────────
 log "Starting Project Zomboid server '${SERVER_NAME}' on port ${SERVER_PORT}..."
+log "  Running as : $(id)"
 log "  Config dir : ${CONFIG_DIR}"
 log "  Port       : ${SERVER_PORT} / ${SERVER_PORT_2} (UDP)"
 log "  RCON       : ${RCON_PORT} (TCP)"

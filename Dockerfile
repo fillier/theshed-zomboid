@@ -13,6 +13,7 @@ RUN dpkg --add-architecture i386 && \
         ca-certificates \
         wget \
         tini \
+        gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Install SteamCMD and pre-initialise it (triggers self-update at build time,
