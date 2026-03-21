@@ -122,13 +122,11 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
 
     WORKSHOP_OUT=$(append_unique "$WORKSHOP_OUT" "$WID")
 
-    # Collect mod.info paths into an array first, then iterate with a plain for
-    # loop. A while loop fed by process substitution can run in a subshell under
-    # set -euo pipefail, causing variable assignments to not persist.
-    mapfile -d $'\0' MODINFO_FILES < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)
-
+    # Use `while read < <(find)` (redirect, not pipe) so the loop body runs in
+    # the current shell and variable assignments persist. A pipe (`find | while`)
+    # would run the loop in a subshell and lose any assignments.
     FOUND_ANY=false
-    for MODINFO_FILE in "${MODINFO_FILES[@]+"${MODINFO_FILES[@]}"}"; do
+    while IFS= read -r -d '' MODINFO_FILE; do
         # || true: grep exits 1 when no match found; don't let that kill the script
         MOD_ID=$(grep -m1 '^id=' "$MODINFO_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n') || true
         if [ -n "$MOD_ID" ]; then
@@ -136,7 +134,7 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
             MODS_OUT=$(append_unique "$MODS_OUT" "$MOD_ID")
             FOUND_ANY=true
         fi
-    done
+    done < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)
 
     if [ "$FOUND_ANY" = false ]; then
         log "WARNING: No mod.info found in workshop item ${WID}"
