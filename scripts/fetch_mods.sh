@@ -7,7 +7,7 @@
 set -euo pipefail
 
 PZ_GAME_ID=108600
-STEAMCMD="${STEAMCMDDIR:-/home/steam/steamcmd}/steamcmd.sh"
+STEAMCMD="${STEAMCMDDIR:-/opt/steamcmd}/steamcmd.sh"
 WORKSHOP_CONTENT="/server/steamapps/workshop/content/${PZ_GAME_ID}"
 
 STEAM_COLLECTION_ID="${STEAM_COLLECTION_ID:-}"
@@ -17,6 +17,18 @@ STEAM_USERNAME="${STEAM_USERNAME:-}"
 STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 
 log() { echo "[fetch_mods] $*" >&2; }
+
+# Show the exact failing command if anything goes wrong
+trap 'log "ERROR at line ${LINENO}: ${BASH_COMMAND}"' ERR
+
+# ── Append an item to a semicolon-separated string if not already present ─────
+append_unique() {
+    local list="$1" item="$2"
+    case ";${list};" in
+        *";${item};"*) echo "$list" ;;          # already present
+        *) echo "${list:+${list};}${item}" ;;   # append
+    esac
+}
 
 # ── Step 1: Fetch collection workshop IDs from Steam API ──────────────────────
 COLLECTION_WORKSHOP_IDS=()
@@ -33,7 +45,7 @@ if [ -n "${STEAM_COLLECTION_ID}" ]; then
 
     RESULT=$(echo "$RESPONSE" | jq -r '.response.collectiondetails[0].result')
     if [ "$RESULT" != "1" ]; then
-        log "ERROR: Steam API returned result=${RESULT} for collection ${STEAM_COLLECTION_ID}" >&2
+        log "ERROR: Steam API returned result=${RESULT} for collection ${STEAM_COLLECTION_ID}"
         exit 1
     fi
 
@@ -45,7 +57,7 @@ if [ -n "${STEAM_COLLECTION_ID}" ]; then
 fi
 
 # ── Step 2: Merge extra IDs ───────────────────────────────────────────────────
-ALL_WORKSHOP_IDS=("${COLLECTION_WORKSHOP_IDS[@]}")
+ALL_WORKSHOP_IDS=("${COLLECTION_WORKSHOP_IDS[@]+"${COLLECTION_WORKSHOP_IDS[@]}"}")
 
 if [ -n "${EXTRA_WORKSHOP_IDS}" ]; then
     IFS=',' read -ra EXTRA_IDS <<< "${EXTRA_WORKSHOP_IDS}"
@@ -63,12 +75,12 @@ if [ ${#ALL_WORKSHOP_IDS[@]} -eq 0 ]; then
 fi
 
 # ── Step 3: Download workshop items via SteamCMD ──────────────────────────────
-# Use +runscript so commands survive steamcmd's self-update restart
 MOD_SCRIPT_FILE=$(mktemp /tmp/steamcmd_mods_XXXXXX.txt)
 trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
 
 {
-    echo "@ShutdownOnFailedCommand 1"
+    # No @ShutdownOnFailedCommand here — a single failed mod download shouldn't
+    # abort the rest. SteamCMD will report errors but continue.
     echo "@NoPromptForPassword 1"
     echo "force_install_dir /server"
 
@@ -78,14 +90,12 @@ trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
         echo "login anonymous"
     fi
 
-    DOWNLOAD_COUNT=0
     for WID in "${ALL_WORKSHOP_IDS[@]}"; do
         ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
         if [ -d "$ITEM_PATH" ] && [ "${UPDATE_MODS}" != "true" ]; then
             log "Skipping already-downloaded mod ${WID} (UPDATE_MODS=false)"
         else
             echo "workshop_download_item ${PZ_GAME_ID} ${WID}"
-            DOWNLOAD_COUNT=$(( DOWNLOAD_COUNT + 1 ))
         fi
     done
 
@@ -99,8 +109,8 @@ log "Downloading workshop item(s) via SteamCMD..."
 }
 
 # ── Step 4: Parse mod.info files to get PZ mod IDs ───────────────────────────
-MODS_ARRAY=()
-WORKSHOP_ARRAY=()
+MODS_OUT=""
+WORKSHOP_OUT=""
 
 for WID in "${ALL_WORKSHOP_IDS[@]}"; do
     ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
@@ -110,46 +120,25 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
         continue
     fi
 
-    WORKSHOP_ARRAY+=("$WID")
+    WORKSHOP_OUT=$(append_unique "$WORKSHOP_OUT" "$WID")
 
-    # PZ mods can have mod.info at the workshop root OR inside mods/<Name>/mod.info
-    # Prefer the mods/ subdirectory layout (new style); fall back to root mod.info.
-    # Only search 3 levels deep to avoid picking up unrelated nested files.
     FOUND_ANY=false
     while IFS= read -r -d '' MODINFO_FILE; do
-        # || true prevents set -e from exiting when grep finds no 'id=' line
+        # || true: grep exits 1 when no match found; don't let that kill the script
         MOD_ID=$(grep -m1 '^id=' "$MODINFO_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n') || true
         if [ -n "$MOD_ID" ]; then
             log "  Workshop ${WID} → mod ID: ${MOD_ID}"
-            MODS_ARRAY+=("$MOD_ID")
+            MODS_OUT=$(append_unique "$MODS_OUT" "$MOD_ID")
             FOUND_ANY=true
         fi
-    done < <(find "$ITEM_PATH" -maxdepth 3 -name "mod.info" -print0 2>/dev/null)
+    done < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)
 
     if [ "$FOUND_ANY" = false ]; then
         log "WARNING: No mod.info found in workshop item ${WID}"
+        log "  Contents: $(find "$ITEM_PATH" -maxdepth 3 | sed "s|${ITEM_PATH}/||" | head -20 | tr '\n' ' ')"
     fi
 done
 
 # ── Step 5: Output results ────────────────────────────────────────────────────
-# Deduplicate while preserving order, join with semicolons
-dedup() {
-    local -A SEEN=()
-    local RESULT=()
-    for ITEM in "$@"; do
-        if [ -z "${SEEN[$ITEM]+_}" ]; then
-            SEEN[$ITEM]=1
-            RESULT+=("$ITEM")
-        fi
-    done
-    local OLD_IFS="$IFS"
-    IFS=';'
-    echo "${RESULT[*]}"
-    IFS="$OLD_IFS"
-}
-
-MODS_OUT=$(dedup "${MODS_ARRAY[@]+"${MODS_ARRAY[@]}"}")
-WORKSHOP_OUT=$(dedup "${WORKSHOP_ARRAY[@]+"${WORKSHOP_ARRAY[@]}"}")
-
 echo "MODS=${MODS_OUT}"
 echo "WORKSHOP=${WORKSHOP_OUT}"
