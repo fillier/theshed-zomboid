@@ -46,7 +46,7 @@ log "SteamCMD script:"
 cat "${SCRIPT_FILE}" >&2
 
 log "Running SteamCMD..."
-"${STEAMCMD}" +runscript "${SCRIPT_FILE}" || {
+"${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 || {
     EXIT=$?
     # Exit code 7 = already up to date — not an error
     [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }

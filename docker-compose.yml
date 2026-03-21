@@ -3,19 +3,13 @@ services:
     build: .
     env_file: .env
     volumes:
-      - pz-server:/server    # Server binaries — survives updates, shared between restarts
-      - pz-data:/data        # Player saves, server config, logs — back this up
+      - ./server:/server    # Server binaries — visible on host as ./server/
+      - ./data:/data        # Player saves, config, logs — visible on host as ./data/
     ports:
       - "${SERVER_PORT:-16261}:${SERVER_PORT:-16261}/udp"
       - "${SERVER_PORT_2:-16262}:${SERVER_PORT_2:-16262}/udp"
       - "${RCON_PORT:-27015}:${RCON_PORT:-27015}/tcp"
     restart: unless-stopped
-    stop_grace_period: 60s   # Allow PZ time to save the world on SIGTERM
-    stdin_open: true          # PZ reads stdin for its admin console
+    stop_grace_period: 60s
+    stdin_open: true
     tty: true
-
-volumes:
-  pz-server:
-    driver: local
-  pz-data:
-    driver: local

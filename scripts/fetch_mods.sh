@@ -93,9 +93,9 @@ trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
 } > "${MOD_SCRIPT_FILE}"
 
 log "Downloading workshop item(s) via SteamCMD..."
-"${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" || {
+"${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" 2>&1 || {
     EXIT=$?
-    [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT" >&2; exit $EXIT; }
+    [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }
 }
 
 # ── Step 4: Parse mod.info files to get PZ mod IDs ───────────────────────────

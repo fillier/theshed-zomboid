@@ -1,6 +1,6 @@
-# Don't commit secrets or local overrides
+# Don't commit secrets
 .env
 
-# Docker data directories if someone binds locally
+# Bind mount directories — large game files and save data
 server/
 data/
