@@ -58,6 +58,8 @@ MEMORY="${MEMORY:-8192m}"
 RESTART_SCHEDULE="${RESTART_SCHEDULE:-}"
 RESTART_WARN_MINUTES="${RESTART_WARN_MINUTES:-10}"
 RCON_PASSWORD="${RCON_PASSWORD:-}"
+MOD_UPDATE_CHECK="${MOD_UPDATE_CHECK:-true}"
+MOD_CHECK_INTERVAL="${MOD_CHECK_INTERVAL:-10m}"
 
 PZ_BIN="/server/start-server.sh"
 CONFIG_DIR="/data"
@@ -117,6 +119,15 @@ fi
 export RESOLVED_MODS="$MODS_LIST"
 export RESOLVED_WORKSHOP="$WORKSHOP_LIST"
 
+# Persist the resolved workshop ID list for the mod watcher to read at runtime.
+# Written one ID per line to /data/.workshop_ids.
+if [ -n "${WORKSHOP_LIST}" ]; then
+    echo "${WORKSHOP_LIST}" | tr ';' '\n' > /data/.workshop_ids
+    log "Saved ${WORKSHOP_LIST//;/ } to /data/.workshop_ids"
+else
+    rm -f /data/.workshop_ids
+fi
+
 # ── Step 2b: Configure RCON password ───────────────────────────────────────────
 # If RCON_PASSWORD is set, write it into the server ini so RCON actually works.
 if [ -n "${RCON_PASSWORD}" ]; then
@@ -130,10 +141,17 @@ mkdir -p "${SERVER_CONFIG_DIR}"
 /app/scripts/write_ini.sh
 /app/scripts/write_sandbox.sh
 
-# ── Step 4: Start restart scheduler (if configured) ───────────────────────────
+# ── Step 4: Start background daemons ──────────────────────────────────────────
 if [ -n "${RESTART_SCHEDULE}" ]; then
     log "Starting restart scheduler (schedule: ${RESTART_SCHEDULE}, warn: ${RESTART_WARN_MINUTES}m)..."
     /app/scripts/restart_scheduler.sh &
+fi
+
+if [ "${MOD_UPDATE_CHECK}" = "true" ] && [ -f /data/.workshop_ids ]; then
+    log "Starting mod update watcher (interval: ${MOD_CHECK_INTERVAL})..."
+    /app/scripts/mod_watcher.sh &
+elif [ "${MOD_UPDATE_CHECK}" = "true" ]; then
+    log "Mod update watcher enabled but no workshop IDs configured — skipping"
 fi
 
 # ── Step 5: Start Server ───────────────────────────────────────────────────────
