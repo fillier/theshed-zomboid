@@ -180,9 +180,11 @@ while true; do
 
     case $status in
         0)
-            # All mods up to date; reset to normal interval if we were backed off
-            [ "$current_interval" -ne "$INTERVAL_SECS" ] \
-                && log "API healthy again — resuming normal ${MOD_CHECK_INTERVAL} interval"
+            # All mods up to date
+            log "All mods up to date (next check in ${MOD_CHECK_INTERVAL})"
+            if [ "$current_interval" -ne "$INTERVAL_SECS" ]; then
+                log "API healthy again — resuming normal ${MOD_CHECK_INTERVAL} interval"
+            fi
             current_interval=$INTERVAL_SECS
             ;;
         1)

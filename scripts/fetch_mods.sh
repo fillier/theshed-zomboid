@@ -204,8 +204,10 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
         # || true: grep exits 1 when no match found; don't let that kill the script
         MOD_ID=$(grep -m1 '^id=' "$MODINFO_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n') || true
         if [ -n "$MOD_ID" ]; then
-            log "  Workshop ${WID} → mod ID: ${MOD_ID}"
+            BEFORE="$MODS_OUT"
             MODS_OUT=$(append_unique "$MODS_OUT" "$MOD_ID")
+            # Only log on first discovery (append_unique is a no-op for dupes)
+            [ "$MODS_OUT" != "$BEFORE" ] && log "  Workshop ${WID} → mod ID: ${MOD_ID}"
             FOUND_ANY=true
         fi
     done < <(find "$ITEM_PATH" -name "mod.info" -print0 2>/dev/null)

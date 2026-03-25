@@ -144,12 +144,12 @@ mkdir -p "${SERVER_CONFIG_DIR}"
 # ── Step 4: Start background daemons ──────────────────────────────────────────
 if [ -n "${RESTART_SCHEDULE}" ]; then
     log "Starting restart scheduler (schedule: ${RESTART_SCHEDULE}, warn: ${RESTART_WARN_MINUTES}m)..."
-    /app/scripts/restart_scheduler.sh &
+    /app/scripts/restart_scheduler.sh >> /data/restart_scheduler.log 2>&1 &
 fi
 
 if [ "${MOD_UPDATE_CHECK}" = "true" ] && [ -f /data/.workshop_ids ]; then
     log "Starting mod update watcher (interval: ${MOD_CHECK_INTERVAL})..."
-    /app/scripts/mod_watcher.sh &
+    /app/scripts/mod_watcher.sh >> /data/mod_watcher.log 2>&1 &
 elif [ "${MOD_UPDATE_CHECK}" = "true" ]; then
     log "Mod update watcher enabled but no workshop IDs configured — skipping"
 fi

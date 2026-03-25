@@ -1,5 +1,6 @@
 services:
   zomboid:
+    build: .
     image: ghcr.io/fillier/theshed-zomboid:latest
     env_file: .env
     volumes:
