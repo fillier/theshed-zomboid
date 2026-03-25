@@ -50,11 +50,14 @@ SERVER_PORT="${SERVER_PORT:-16261}"
 SERVER_PORT_2="${SERVER_PORT_2:-$(( SERVER_PORT + 1 ))}"
 RCON_PORT="${RCON_PORT:-27015}"
 UPDATE_ON_START="${UPDATE_ON_START:-true}"
-UPDATE_MODS="${UPDATE_MODS:-false}"
+UPDATE_MODS="${UPDATE_MODS:-true}"
 BETA_BRANCH="${BETA_BRANCH:-}"
 STEAM_COLLECTION_ID="${STEAM_COLLECTION_ID:-}"
 EXTRA_WORKSHOP_IDS="${EXTRA_WORKSHOP_IDS:-}"
 MEMORY="${MEMORY:-8192m}"
+RESTART_SCHEDULE="${RESTART_SCHEDULE:-}"
+RESTART_WARN_MINUTES="${RESTART_WARN_MINUTES:-10}"
+RCON_PASSWORD="${RCON_PASSWORD:-}"
 
 PZ_BIN="/server/start-server.sh"
 CONFIG_DIR="/data"
@@ -114,6 +117,12 @@ fi
 export RESOLVED_MODS="$MODS_LIST"
 export RESOLVED_WORKSHOP="$WORKSHOP_LIST"
 
+# ── Step 2b: Configure RCON password ───────────────────────────────────────────
+# If RCON_PASSWORD is set, write it into the server ini so RCON actually works.
+if [ -n "${RCON_PASSWORD}" ]; then
+    export PZ_INI_RCONPassword="${RCON_PASSWORD}"
+fi
+
 # ── Step 3: Write Config Files ─────────────────────────────────────────────────
 log "Writing server config files..."
 mkdir -p "${SERVER_CONFIG_DIR}"
@@ -121,7 +130,13 @@ mkdir -p "${SERVER_CONFIG_DIR}"
 /app/scripts/write_ini.sh
 /app/scripts/write_sandbox.sh
 
-# ── Step 4: Start Server ───────────────────────────────────────────────────────
+# ── Step 4: Start restart scheduler (if configured) ───────────────────────────
+if [ -n "${RESTART_SCHEDULE}" ]; then
+    log "Starting restart scheduler (schedule: ${RESTART_SCHEDULE}, warn: ${RESTART_WARN_MINUTES}m)..."
+    /app/scripts/restart_scheduler.sh &
+fi
+
+# ── Step 5: Start Server ───────────────────────────────────────────────────────
 log "Starting Project Zomboid server '${SERVER_NAME}' on port ${SERVER_PORT}..."
 log "  Running as : $(id)"
 log "  Config dir : ${CONFIG_DIR}"

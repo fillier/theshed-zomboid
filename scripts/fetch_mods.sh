@@ -74,41 +74,115 @@ if [ ${#ALL_WORKSHOP_IDS[@]} -eq 0 ]; then
     exit 0
 fi
 
-# ── Step 3: Download workshop items via SteamCMD ──────────────────────────────
-MOD_SCRIPT_FILE=$(mktemp /tmp/steamcmd_mods_XXXXXX.txt)
-trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
+# ── Step 3: Determine which mods need downloading ─────────────────────────────
+TO_DOWNLOAD=()
+declare -A STEAM_UPDATE_TIMES
 
-{
-    # No @ShutdownOnFailedCommand here — a single failed mod download shouldn't
-    # abort the rest. SteamCMD will report errors but continue.
-    echo "@NoPromptForPassword 1"
-    echo "force_install_dir /server"
+if [ "${UPDATE_MODS}" = "false" ]; then
+    # Skip any mod whose directory already exists — fastest restart mode
+    for WID in "${ALL_WORKSHOP_IDS[@]}"; do
+        ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
+        if [ -d "$ITEM_PATH" ]; then
+            log "Skipping ${WID} — already present (UPDATE_MODS=false)"
+        else
+            TO_DOWNLOAD+=("$WID")
+        fi
+    done
 
-    if [ -n "${STEAM_USERNAME}" ]; then
-        echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
+elif [ "${UPDATE_MODS}" = "force" ]; then
+    # Re-download everything unconditionally
+    log "Force re-downloading all ${#ALL_WORKSHOP_IDS[@]} mod(s) (UPDATE_MODS=force)"
+    TO_DOWNLOAD=("${ALL_WORKSHOP_IDS[@]}")
+
+else
+    # Smart update: fetch Steam timestamps, only download new or updated mods
+    log "Checking Steam update timestamps for ${#ALL_WORKSHOP_IDS[@]} mod(s)..."
+
+    # Build POST body for a single batched request
+    DETAIL_BODY="itemcount=${#ALL_WORKSHOP_IDS[@]}"
+    for i in "${!ALL_WORKSHOP_IDS[@]}"; do
+        DETAIL_BODY+="&publishedfileids[${i}]=${ALL_WORKSHOP_IDS[$i]}"
+    done
+
+    DETAILS=$(curl -sf -X POST \
+        "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/" \
+        -d "${DETAIL_BODY}" \
+        --connect-timeout 15 \
+        --max-time 30 2>/dev/null) || DETAILS=""
+
+    if [ -n "$DETAILS" ]; then
+        while IFS=$'\t' read -r fid tupdate; do
+            STEAM_UPDATE_TIMES["$fid"]="$tupdate"
+        done < <(echo "$DETAILS" \
+            | jq -r '.response.publishedfiledetails[] | [.publishedfileid, (.time_updated // 0)] | @tsv')
     else
-        echo "login anonymous"
+        log "WARNING: Could not reach Steam API for update times — will download all mods"
     fi
 
     for WID in "${ALL_WORKSHOP_IDS[@]}"; do
         ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
-        if [ -d "$ITEM_PATH" ] && [ "${UPDATE_MODS}" != "true" ]; then
-            log "Skipping already-downloaded mod ${WID} (UPDATE_MODS=false)"
+        CACHE_FILE="${ITEM_PATH}/.steam_update_time"
+        STEAM_TIME="${STEAM_UPDATE_TIMES[$WID]:-0}"
+
+        if [ ! -d "$ITEM_PATH" ]; then
+            log "Mod ${WID}: not present — queuing download"
+            TO_DOWNLOAD+=("$WID")
+        elif [ ! -f "$CACHE_FILE" ]; then
+            log "Mod ${WID}: no update cache — queuing download"
+            TO_DOWNLOAD+=("$WID")
+        elif [ "$STEAM_TIME" -gt "$(cat "$CACHE_FILE")" ] 2>/dev/null; then
+            log "Mod ${WID}: update available (steam=${STEAM_TIME} > cached=$(cat "$CACHE_FILE")) — queuing"
+            TO_DOWNLOAD+=("$WID")
         else
-            echo "workshop_download_item ${PZ_GAME_ID} ${WID}"
+            log "Mod ${WID}: up to date (steam_time=${STEAM_TIME})"
         fi
     done
+fi
 
-    echo "quit"
-} > "${MOD_SCRIPT_FILE}"
+# ── Step 4: Download workshop items via SteamCMD ──────────────────────────────
+MOD_SCRIPT_FILE=$(mktemp /tmp/steamcmd_mods_XXXXXX.txt)
+trap 'rm -f "${MOD_SCRIPT_FILE}"' EXIT
 
-log "Downloading workshop item(s) via SteamCMD..."
-"${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" 1>&2 2>&1 || {
-    EXIT=$?
-    [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }
-}
+if [ ${#TO_DOWNLOAD[@]} -gt 0 ]; then
+    log "Downloading ${#TO_DOWNLOAD[@]} of ${#ALL_WORKSHOP_IDS[@]} workshop item(s) via SteamCMD..."
 
-# ── Step 4: Parse mod.info files to get PZ mod IDs ───────────────────────────
+    {
+        # No @ShutdownOnFailedCommand here — a single failed mod download shouldn't
+        # abort the rest. SteamCMD will report errors but continue.
+        echo "@NoPromptForPassword 1"
+        echo "force_install_dir /server"
+
+        if [ -n "${STEAM_USERNAME}" ]; then
+            echo "login ${STEAM_USERNAME} ${STEAM_PASSWORD}"
+        else
+            echo "login anonymous"
+        fi
+
+        for WID in "${TO_DOWNLOAD[@]}"; do
+            echo "workshop_download_item ${PZ_GAME_ID} ${WID}"
+        done
+
+        echo "quit"
+    } > "${MOD_SCRIPT_FILE}"
+
+    "${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" 1>&2 2>&1 || {
+        EXIT=$?
+        [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }
+    }
+
+    # Cache the Steam update timestamp so future runs skip unchanged mods
+    for WID in "${TO_DOWNLOAD[@]}"; do
+        ITEM_PATH="${WORKSHOP_CONTENT}/${WID}"
+        STEAM_TIME="${STEAM_UPDATE_TIMES[$WID]:-}"
+        if [ -d "$ITEM_PATH" ] && [ -n "$STEAM_TIME" ] && [ "$STEAM_TIME" != "0" ]; then
+            echo "$STEAM_TIME" > "${ITEM_PATH}/.steam_update_time"
+        fi
+    done
+else
+    log "All mods are up to date — skipping SteamCMD"
+fi
+
+# ── Step 5: Parse mod.info files to get PZ mod IDs ───────────────────────────
 MODS_OUT=""
 WORKSHOP_OUT=""
 
@@ -142,6 +216,6 @@ for WID in "${ALL_WORKSHOP_IDS[@]}"; do
     fi
 done
 
-# ── Step 5: Output results ────────────────────────────────────────────────────
+# ── Step 6: Output results ────────────────────────────────────────────────────
 echo "MODS=${MODS_OUT}"
 echo "WORKSHOP=${WORKSHOP_OUT}"

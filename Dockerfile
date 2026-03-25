@@ -14,6 +14,7 @@ RUN dpkg --add-architecture i386 && \
         wget \
         tini \
         gosu \
+        python3-minimal \
     && rm -rf /var/lib/apt/lists/*
 
 # Install SteamCMD and pre-initialise it (triggers self-update at build time,
@@ -29,7 +30,7 @@ ENV STEAMCMDDIR=/opt/steamcmd
 RUN mkdir -p /server /data
 
 COPY scripts/ /app/scripts/
-RUN chmod +x /app/scripts/*.sh
+RUN chmod +x /app/scripts/*.sh /app/scripts/*.py
 
 # /server = PZ dedicated server installation (~3GB)
 # /data   = PZ configdir: saves, server config, logs
