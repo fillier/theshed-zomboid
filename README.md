@@ -8,6 +8,8 @@ A Docker container for a Project Zomboid dedicated server. Configure everything 
 - **Steam collection support** — point at a collection URL and mods are fetched, downloaded, and wired up automatically
 - **Beta branch support** — pin to any Steam beta branch (e.g. `iwbums`)
 - **Automatic updates** — server and mods update on each container restart (configurable)
+- **Mod update watcher** — polls Steam for mod updates and restarts the server automatically when a new version is detected
+- **Scheduled restarts** — restart daily at a set time or on an interval, with in-game countdown warnings
 - **Separated volumes** — server binaries and game data (saves, config, logs) in separate bind mounts
 
 ## Quick Start
@@ -39,8 +41,8 @@ All configuration lives in `.env`. See [`.env.example`](.env.example) for the fu
 | `ADMIN_PASSWORD` | `changeme` | Server admin password |
 | `SERVER_PORT` | `16261` | Primary UDP game port |
 | `RCON_PORT` | `27015` | RCON TCP port |
-| `UPDATE_ON_START` | `true` | Re-run SteamCMD on each restart |
-| `UPDATE_MODS` | `true` | Re-download workshop mods on each restart |
+| `UPDATE_ON_START` | `true` | Re-run SteamCMD to update the server binary on each restart |
+| `UPDATE_MODS` | `true` | Mod download behaviour on start (see [Updating](#updating)) |
 | `BETA_BRANCH` | *(empty)* | Target a Steam beta branch (e.g. `iwbums`) |
 
 ### Mods — Steam Collection
@@ -67,6 +69,39 @@ To include individual mods not in the collection, add them as a comma-separated 
 ```env
 EXTRA_WORKSHOP_IDS=2392847436,2100026811
 ```
+
+### Scheduled Restarts
+
+The server can restart automatically on a schedule, with in-game countdown warnings sent via RCON.
+
+```env
+RCON_PASSWORD=yourpassword      # enables in-game warnings; also sets RCONPassword= in server config
+RESTART_SCHEDULE=04:00          # restart daily at 4 AM (set TZ= for your timezone)
+RESTART_WARN_MINUTES=10         # warn players 10, 5, and 1 minute before restart
+```
+
+`RESTART_SCHEDULE` formats:
+
+| Format | Example | Behaviour |
+|---|---|---|
+| `HH:MM` | `04:00` | Restart daily at that local time |
+| `Xh` | `6h` | Restart every X hours from container start |
+| `Xm` | `30m` | Restart every X minutes (useful for testing) |
+| *(empty)* | | No scheduled restart |
+
+Leave `RCON_PASSWORD` blank to restart silently without in-game warnings.
+
+### Mod Update Watcher
+
+The mod update watcher polls Steam in the background and automatically restarts the server when a newer version of any workshop item is detected. When an update is found, players receive countdown warnings before the server shuts down. On restart, the updated mods are downloaded before the server comes back up.
+
+```env
+MOD_UPDATE_CHECK=true     # set to false to disable
+MOD_CHECK_INTERVAL=10m    # how often to poll Steam (Xh, Xm, or Xs)
+RCON_PASSWORD=yourpassword  # required for in-game warnings
+```
+
+The watcher makes a single batched API request for all mods regardless of collection size. Steam's limit is 100,000 calls/day; at the 10-minute default this uses ~144 calls/day. On HTTP 429 the interval backs off exponentially (doubles each time, capped at 1 hour) and resets on success.
 
 ### Server Properties
 
@@ -120,16 +155,17 @@ volumes:
 
 ## Updating
 
-**Server update:** Set `UPDATE_ON_START=true` (default) and restart the container.
+**Server binary:** Set `UPDATE_ON_START=true` (default) and restart the container.
 
-**Mod update:** Set `UPDATE_MODS=true` (default) and restart. Mods are re-downloaded from Steam.
+**Mods:** Controlled by `UPDATE_MODS`:
 
-To skip updates for faster restarts once everything is installed:
+| Value | Behaviour |
+|---|---|
+| `true` | Smart update (default) — checks Steam timestamps, only re-downloads mods that have changed |
+| `false` | Skip already-present mods entirely — fastest restarts, no Steam API call |
+| `force` | Re-download every mod unconditionally |
 
-```env
-UPDATE_ON_START=false
-UPDATE_MODS=false
-```
+The mod update watcher handles updates automatically without manual restarts. See [Mod Update Watcher](#mod-update-watcher).
 
 ## Steam Credentials
 
