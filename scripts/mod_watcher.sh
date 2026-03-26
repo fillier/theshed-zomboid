@@ -88,10 +88,15 @@ warn_and_restart() {
     local remaining=$(( warn_seconds - elapsed ))
     [ "$remaining" -gt 0 ] && sleep "$remaining"
 
-    log "Sending SIGTERM to PID 1 (tini) for graceful shutdown..."
     server_say "Server is restarting NOW to apply mod updates. See you in a moment!"
     sleep 3
-    kill -TERM 1
+    PID_FILE=/data/.pz_server.pid
+    if [ -f "${PID_FILE}" ]; then
+        log "Sending SIGTERM to PZ server (PID $(cat "${PID_FILE}"))..."
+        kill -TERM "$(cat "${PID_FILE}")"
+    else
+        log "WARNING: PID file not found — cannot signal server"
+    fi
     sleep 10  # won't normally be reached
 }
 

@@ -79,8 +79,13 @@ do_restart() {
     log "Initiating graceful restart..."
     server_say "Server is restarting NOW. See you in a moment!"
     sleep 3
-    # SIGTERM to PID 1 (tini) → tini forwards to the PZ server → clean shutdown
-    kill -TERM 1
+    PID_FILE=/data/.pz_server.pid
+    if [ -f "${PID_FILE}" ]; then
+        log "Sending SIGTERM to PZ server (PID $(cat "${PID_FILE}"))..."
+        kill -TERM "$(cat "${PID_FILE}")"
+    else
+        log "WARNING: PID file not found — cannot signal server"
+    fi
 }
 
 # ── Guards ────────────────────────────────────────────────────────────────────
@@ -155,7 +160,7 @@ while true; do
 
     do_restart
 
-    # This point is not reached — kill -TERM 1 will also terminate this script
-    # as Docker tears down the container. Sleep briefly as a safety net.
+    # After signaling the server, Docker tears down the container which will
+    # also terminate this script. Sleep briefly as a safety net.
     sleep 10
 done

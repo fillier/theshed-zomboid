@@ -163,9 +163,13 @@ log "  RCON       : ${RCON_PORT} (TCP)"
 [ -n "$STEAM_COLLECTION_ID" ] && log "  Collection : ${STEAM_COLLECTION_ID}"
 [ -n "$MODS_LIST" ]           && log "  Mods       : ${MODS_LIST}"
 
-exec "${PZ_BIN}" \
+"${PZ_BIN}" \
     -servername "${SERVER_NAME}" \
     -adminpassword "${ADMIN_PASSWORD}" \
     -configdir "${CONFIG_DIR}" \
     -port "${SERVER_PORT}" \
-    -udpport "${SERVER_PORT_2}"
+    -udpport "${SERVER_PORT_2}" &
+PZ_PID=$!
+echo "${PZ_PID}" > /data/.pz_server.pid
+wait "${PZ_PID}"
+rm -f /data/.pz_server.pid
