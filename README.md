@@ -44,6 +44,7 @@ All configuration lives in `.env`. See [`.env.example`](.env.example) for the fu
 | `UPDATE_ON_START` | `true` | Re-run SteamCMD to update the server binary on each restart |
 | `UPDATE_MODS` | `true` | Mod download behaviour on start (see [Updating](#updating)) |
 | `BETA_BRANCH` | *(empty)* | Target a Steam beta branch (e.g. `iwbums`) |
+| `TZ` | `UTC` | Timezone for scheduled restarts (e.g. `Australia/Sydney`) |
 
 ### Mods — Steam Collection
 
@@ -75,8 +76,9 @@ EXTRA_WORKSHOP_IDS=2392847436,2100026811
 The server can restart automatically on a schedule, with in-game countdown warnings sent via RCON.
 
 ```env
+TZ=Australia/Sydney             # timezone for the HH:MM schedule
 RCON_PASSWORD=yourpassword      # enables in-game warnings; also sets RCONPassword= in server config
-RESTART_SCHEDULE=04:00          # restart daily at 4 AM (set TZ= for your timezone)
+RESTART_SCHEDULE=04:00          # restart daily at 4 AM local time
 RESTART_WARN_MINUTES=10         # warn players 10, 5, and 1 minute before restart
 ```
 
@@ -84,7 +86,7 @@ RESTART_WARN_MINUTES=10         # warn players 10, 5, and 1 minute before restar
 
 | Format | Example | Behaviour |
 |---|---|---|
-| `HH:MM` | `04:00` | Restart daily at that local time |
+| `HH:MM` | `04:00` | Restart daily at that local time (respects `TZ`) |
 | `Xh` | `6h` | Restart every X hours from container start |
 | `Xm` | `30m` | Restart every X minutes (useful for testing) |
 | *(empty)* | | No scheduled restart |
