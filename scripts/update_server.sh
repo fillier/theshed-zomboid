@@ -45,11 +45,31 @@ trap 'rm -f "${SCRIPT_FILE}"' EXIT
 log "SteamCMD script:"
 cat "${SCRIPT_FILE}" >&2
 
-log "Running SteamCMD..."
-"${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 || {
-    EXIT=$?
-    # Exit code 7 = already up to date — not an error
-    [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }
-}
+MAX_RETRIES=5
+RETRY_DELAY=30
 
-log "Server install/update complete"
+for attempt in $(seq 1 $MAX_RETRIES); do
+    log "Running SteamCMD (attempt ${attempt}/${MAX_RETRIES})..."
+    OUTPUT=$("${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1)
+    EXIT=$?
+    echo "${OUTPUT}"
+
+    # SteamCMD frequently exits 0 even on failure — check stdout for error strings
+    if echo "${OUTPUT}" | grep -q "ERROR!"; then
+        log "SteamCMD reported an error (exit ${EXIT})"
+    elif [ $EXIT -eq 0 ] || [ $EXIT -eq 7 ]; then
+        # Exit 7 = already up to date — also fine
+        log "Server install/update complete"
+        exit 0
+    else
+        log "SteamCMD exited with code ${EXIT}"
+    fi
+
+    if [ $attempt -lt $MAX_RETRIES ]; then
+        log "Retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+    fi
+done
+
+log "ERROR: SteamCMD failed after ${MAX_RETRIES} attempts"
+exit 1
