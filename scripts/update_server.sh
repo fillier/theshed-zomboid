@@ -19,7 +19,8 @@ log "Running as: $(id)"
 log "SteamCMD: ${STEAMCMD}"
 
 SCRIPT_FILE=$(mktemp /tmp/steamcmd_XXXXXX.txt)
-trap 'rm -f "${SCRIPT_FILE}"' EXIT
+OUTPUT_FILE=$(mktemp /tmp/steamcmd_out_XXXXXX.txt)
+trap 'rm -f "${SCRIPT_FILE}" "${OUTPUT_FILE}"' EXIT
 
 {
     echo "force_install_dir /server"
@@ -50,12 +51,11 @@ RETRY_DELAY=30
 
 for attempt in $(seq 1 $MAX_RETRIES); do
     log "Running SteamCMD (attempt ${attempt}/${MAX_RETRIES})..."
-    OUTPUT=$("${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1)
-    EXIT=$?
-    echo "${OUTPUT}"
+    "${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 | tee "${OUTPUT_FILE}"
+    EXIT=${PIPESTATUS[0]}
 
     # SteamCMD frequently exits 0 even on failure — check stdout for error strings
-    if echo "${OUTPUT}" | grep -q "ERROR!"; then
+    if grep -q "ERROR!" "${OUTPUT_FILE}"; then
         log "SteamCMD reported an error (exit ${EXIT})"
     elif [ $EXIT -eq 0 ] || [ $EXIT -eq 7 ]; then
         # Exit 7 = already up to date — also fine
