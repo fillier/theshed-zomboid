@@ -15,6 +15,7 @@ RUN dpkg --add-architecture i386 && \
         tini \
         gosu \
         python3-minimal \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Install SteamCMD and pre-initialise it (triggers self-update at build time,
