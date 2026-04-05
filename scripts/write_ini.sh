@@ -13,7 +13,7 @@ INI_FILE="/data/Server/${SERVER_NAME}.ini"
 RESOLVED_MODS="${RESOLVED_MODS:-}"
 RESOLVED_WORKSHOP="${RESOLVED_WORKSHOP:-}"
 
-log() { echo "[write_ini] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [write_ini] $*"; }
 
 mkdir -p "/data/Server"
 

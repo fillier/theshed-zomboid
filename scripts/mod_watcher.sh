@@ -30,7 +30,7 @@ PZ_GAME_ID=108600
 WORKSHOP_CONTENT="/server/steamapps/workshop/content/${PZ_GAME_ID}"
 WORKSHOP_IDS_FILE="/data/.workshop_ids"
 
-log() { echo "[mod_watcher] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [mod_watcher] $*"; }
 
 # ── Parse an interval string (Xh / Xm / Xs) to seconds ───────────────────────
 interval_to_seconds() {

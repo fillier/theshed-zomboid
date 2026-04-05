@@ -2,7 +2,7 @@
 # entrypoint.sh — Project Zomboid dedicated server startup orchestration
 set -euo pipefail
 
-log() { echo "[entrypoint] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [entrypoint] $*"; }
 
 # ── Privilege setup ────────────────────────────────────────────────────────────
 # Runs once as root to create the target user/group and fix volume ownership,

@@ -18,7 +18,7 @@ RESTART_WARN_MINUTES="${RESTART_WARN_MINUTES:-10}"
 RCON_PORT="${RCON_PORT:-27015}"
 RCON_PASSWORD="${RCON_PASSWORD:-}"
 
-log() { echo "[scheduler] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [scheduler] $*"; }
 
 # ── Parse schedule and return seconds until next restart ──────────────────────
 next_restart_seconds() {

@@ -8,7 +8,7 @@ BETA_BRANCH="${BETA_BRANCH:-}"
 STEAM_USERNAME="${STEAM_USERNAME:-}"
 STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 
-log() { echo "[update_server] $*" >&2; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [update_server] $*" >&2; }
 
 # Ensure the install dir exists and is writable before SteamCMD touches it
 mkdir -p /server

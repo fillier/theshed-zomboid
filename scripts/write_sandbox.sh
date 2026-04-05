@@ -9,7 +9,7 @@ SERVER_NAME="${SERVER_NAME:-zomboid}"
 SANDBOX_FILE="/data/Server/${SERVER_NAME}_SandboxVars.lua"
 RESOLVED_MODS="${RESOLVED_MODS:-}"
 
-log() { echo "[write_sandbox] $*"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [write_sandbox] $*"; }
 
 log "Writing ${SANDBOX_FILE}..."
 

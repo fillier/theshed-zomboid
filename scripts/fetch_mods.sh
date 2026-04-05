@@ -16,7 +16,7 @@ UPDATE_MODS="${UPDATE_MODS:-true}"
 STEAM_USERNAME="${STEAM_USERNAME:-}"
 STEAM_PASSWORD="${STEAM_PASSWORD:-}"
 
-log() { echo "[fetch_mods] $*" >&2; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [fetch_mods] $*" >&2; }
 
 # Show the exact failing command if anything goes wrong
 trap 'log "ERROR at line ${LINENO}: ${BASH_COMMAND}"' ERR
