@@ -180,8 +180,8 @@ current_interval=$INTERVAL_SECS
 while true; do
     sleep "$current_interval"
 
-    check_for_updates
-    status=$?
+    status=0
+    check_for_updates || status=$?
 
     case $status in
         0)
