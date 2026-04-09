@@ -51,8 +51,10 @@ RETRY_DELAY=30
 
 for attempt in $(seq 1 $MAX_RETRIES); do
     log "Running SteamCMD (attempt ${attempt}/${MAX_RETRIES})..."
+    set +e
     "${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 | tee "${OUTPUT_FILE}"
     EXIT=${PIPESTATUS[0]}
+    set -e
 
     # SteamCMD frequently exits 0 even on failure — check stdout for error strings
     if grep -q "ERROR!" "${OUTPUT_FILE}"; then
