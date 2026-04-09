@@ -52,7 +52,7 @@ RETRY_DELAY=30
 for attempt in $(seq 1 $MAX_RETRIES); do
     log "Running SteamCMD (attempt ${attempt}/${MAX_RETRIES})..."
     set +e
-    "${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 | tee "${OUTPUT_FILE}"
+    unbuffer "${STEAMCMD}" +runscript "${SCRIPT_FILE}" 2>&1 | tee "${OUTPUT_FILE}"
     EXIT=${PIPESTATUS[0]}
     set -e
 

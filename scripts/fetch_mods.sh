@@ -165,7 +165,7 @@ if [ ${#TO_DOWNLOAD[@]} -gt 0 ]; then
         echo "quit"
     } > "${MOD_SCRIPT_FILE}"
 
-    "${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" 1>&2 2>&1 || {
+    unbuffer "${STEAMCMD}" +runscript "${MOD_SCRIPT_FILE}" 1>&2 2>&1 || {
         EXIT=$?
         [ $EXIT -ne 7 ] && { log "ERROR: SteamCMD exited with code $EXIT"; exit $EXIT; }
     }
